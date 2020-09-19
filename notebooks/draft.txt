@@ -1,0 +1,45 @@
+'''
+Setting datatypes beforehand does not work.
+Empty lines cannot be skipped with Pandas read_csv skip_blank_lines keyword.
+
+'''
+
+numerical_dtypes = dict(zip(numerical_cols,
+                            ['float32']*len(numerical_cols)))
+numerical_dtypes.update({'passenger_count': 'uint8'})
+
+categorical_dtypes = dict(zip(categorical_cols,
+                              ['uint8']*len(categorical_cols)))
+categorical_dtypes.update({'store_and_fwd_flag': 'U1'})
+
+location_dtypes = dict(zip(location_cols,
+                           ['uint16']*len(location_cols)))
+
+datetime_dtypes = dict(zip(datetime_cols,
+                            ['M8[us]']*len(datetime_cols)))
+
+dtypes = numerical_dtypes.copy()
+dtypes.update(categorical_dtypes)
+dtypes.update(location_dtypes)
+dtypes.update(datetime_dtypes)
+
+df = dd.read_csv(taxi_data_pattern, skip_blank_lines=True, delimiter=',', dtype=dtypes)
+df_initial_n_rows = df.shape[0]
+
+# Compute a boolean index of al rows with all entries equal to NAN
+df_nans = df.isna().all(axis=1)
+# Drop these columns from the datasets
+df = df.dropna('all')
+
+df.store_and_fwd_flag = df.store_and_fwd_flag.replace({'Y': 1, 'N': 0})
+df.store_and_fwd_flag = df.store_and_fwd_flag.astype('uint8')
+
+filter_zero_fare = df.fare_amount == 0
+df_zero_fare = df.loc[filter_zero_fare]
+
+filter_neg_num = (df[numerical_cols] < 0).any(axis=1)
+df_neg = df.loc[filter_neg_num]
+
+df = df.loc[~(filter_neg_num | filter_zero_fare)]
+
+df = df.reset_index(drop=True)
